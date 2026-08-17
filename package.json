@@ -1,0 +1,33 @@
+{
+  "name": "securevault",
+  "version": "1.0.0",
+  "description": "VaultKey is a web application designed to simplify password management by organizing credentials around modern multi-account workflows. Built with a focus on ease of use, security, and customization, it allows users to safely store, organize, and manage their login details in one place.",
+  "keywords": [
+    "javascript",
+    "password"
+  ],
+  "license": "ISC",
+  "author": "Shuvom Dhar",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "firebase": "^12.17.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.9.2",
+    "morgan": "^1.11.0",
+    "nodemailer": "^9.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.6"
+  }
+}
