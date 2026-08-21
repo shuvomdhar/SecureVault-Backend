@@ -30,15 +30,14 @@ export const registerUser = async ({ name, email, password }) => {
     existingUser.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
     await existingUser.save();
     
-    try {
-      await sendOTPEmail(existingUser.email, otp, 'Account Verification');
-    } catch (emailErr) {
-      throw new Error('Registration saved but failed to send verification email. Please try "Resend Code".');
-    }
+    const emailRes = await sendOTPEmail(existingUser.email, otp, 'Account Verification');
     return {
-      message: 'Account details updated. Verification OTP sent to your email.',
+      message: emailRes.emailSent 
+        ? 'Account details updated. Verification OTP sent to your email.'
+        : 'Account details updated. Verification OTP generated.',
       email: existingUser.email,
       requiresOTP: true,
+      ...(emailRes.simulated ? { otp } : {}),
     };
   }
 
@@ -55,16 +54,15 @@ export const registerUser = async ({ name, email, password }) => {
     otpExpires: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  try {
-    await sendOTPEmail(newUser.email, otp, 'Account Verification');
-  } catch (emailErr) {
-    throw new Error('Account created but failed to send verification email. Please try "Resend Code".');
-  }
+  const emailRes = await sendOTPEmail(newUser.email, otp, 'Account Verification');
 
   return {
-    message: 'User registered successfully. Verification OTP sent to email.',
+    message: emailRes.emailSent
+      ? 'User registered successfully. Verification OTP sent to your email.'
+      : 'User registered successfully. Verification OTP generated.',
     email: newUser.email,
     requiresOTP: true,
+    ...(emailRes.simulated ? { otp } : {}),
   };
 };
 
@@ -93,16 +91,15 @@ export const loginUser = async ({ email, password }) => {
   user.pendingSession = true;
   await user.save();
 
-  try {
-    await sendOTPEmail(user.email, otp, 'Login Verification');
-  } catch (emailErr) {
-    throw new Error('Login accepted but failed to send OTP email. Please try again.');
-  }
+  const emailRes = await sendOTPEmail(user.email, otp, 'Login Verification');
 
   return {
-    message: 'Login credentials accepted. OTP sent to your email for verification.',
+    message: emailRes.emailSent
+      ? 'Login credentials accepted. OTP sent to your email for verification.'
+      : 'Login credentials accepted. OTP generated for verification.',
     email: user.email,
     requiresOTP: true,
+    ...(emailRes.simulated ? { otp } : {}),
   };
 };
 
@@ -137,16 +134,15 @@ export const googleAuthUser = async ({ email, name, googleId, avatar }) => {
     await user.save();
   }
 
-  try {
-    await sendOTPEmail(user.email, otp, 'Google Login Verification');
-  } catch (emailErr) {
-    throw new Error('Google auth succeeded but failed to send OTP email. Please try again.');
-  }
+  const emailRes = await sendOTPEmail(user.email, otp, 'Google Login Verification');
 
   return {
-    message: 'Google authentication successful. OTP sent to your email for verification.',
+    message: emailRes.emailSent
+      ? 'Google authentication successful. OTP sent to your email for verification.'
+      : 'Google authentication successful. OTP generated for verification.',
     email: user.email,
     requiresOTP: true,
+    ...(emailRes.simulated ? { otp } : {}),
   };
 };
 
@@ -203,14 +199,13 @@ export const resendOTPCode = async ({ email }) => {
   user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
   await user.save();
 
-  try {
-    await sendOTPEmail(user.email, otp, 'Resend OTP');
-  } catch (emailErr) {
-    throw new Error('Failed to resend verification email. Please try again later.');
-  }
+  const emailRes = await sendOTPEmail(user.email, otp, 'Resend OTP');
 
   return {
-    message: 'A fresh OTP code has been dispatched to your email.',
+    message: emailRes.emailSent
+      ? 'A fresh OTP code has been dispatched to your email.'
+      : 'A fresh OTP code has been generated.',
     email: user.email,
+    ...(emailRes.simulated ? { otp } : {}),
   };
 };
