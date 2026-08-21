@@ -1,135 +1,115 @@
 import nodemailer from 'nodemailer';
 
 /**
- * Creates a Nodemailer transporter using available credentials:
- *   1. Gmail App Password (recommended — never expires)
- *   2. Generic SMTP (Brevo, SendGrid, Mailgun, etc.)
- *   3. Gmail OAuth2 (fallback, subject to token expiry)
+ * Creates primary and fallback transporters for sending emails.
+ * Port 587 STARTTLS is the cloud-friendly standard (works seamlessly across Render, AWS, GCP).
  */
-const getTransporter = () => {
-  const user = (process.env.GOOGLE_USER || process.env.SMTP_USER || '').trim().replace(/['"]/g, '');
+const createGmailTransporter = (user, appPassword) => {
+  const cleanPass = appPassword.replace(/\s+/g, '');
+  
+  // Strategy 1 (Primary for Cloud): Port 587 STARTTLS
+  const smtp587 = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: {
+      user,
+      pass: cleanPass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
 
-  // Strategy 1: Gmail App Password (simple, reliable SMTP)
-  const appPassword = (process.env.GOOGLE_APP_PASSWORD || '').trim().replace(/['"]/g, '');
-  if (user && appPassword) {
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user,
-          pass: appPassword.replace(/\s+/g, ''), // handle passwords with or without spaces
-        },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 10000,
-      });
-      return { transporter, type: 'Gmail App Password (SMTP)' };
-    } catch (err) {
-      console.error('❌ Error creating Gmail App Password transporter:', err.message);
-    }
-  }
+  // Strategy 2 (Fallback): Port 465 Direct SSL
+  const smtp465 = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user,
+      pass: cleanPass,
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
 
-  // Strategy 2: Generic SMTP
-  const smtpHost = (process.env.SMTP_HOST || '').trim();
-  const smtpPass = (process.env.SMTP_PASS || '').trim();
-  if (smtpHost && user && smtpPass) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465,
-        auth: {
-          user,
-          pass: smtpPass,
-        },
-        connectionTimeout: 5000,
-        greetingTimeout: 5000,
-        socketTimeout: 5000,
-      });
-      return { transporter, type: `SMTP (${smtpHost})` };
-    } catch (err) {
-      console.error('❌ Error creating generic SMTP transporter:', err.message);
-    }
-  }
-
-  // Strategy 3: Gmail OAuth2
-  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim().replace(/['"]/g, '');
-  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim().replace(/['"]/g, '');
-  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim().replace(/['"]/g, '');
-
-  if (user && clientId && clientSecret && refreshToken) {
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          type: 'OAuth2',
-          user,
-          clientId,
-          clientSecret,
-          refreshToken,
-        },
-        connectionTimeout: 5000,
-        greetingTimeout: 5000,
-        socketTimeout: 5000,
-      });
-      return { transporter, type: 'Gmail OAuth2' };
-    } catch (err) {
-      console.error('❌ Error creating Gmail OAuth2 transporter:', err.message);
-    }
-  }
-
-  return null;
+  return { smtp587, smtp465 };
 };
 
 /**
  * Send OTP verification email to user.
- * Dispatches email quickly or falls back gracefully without blocking login/signup.
  */
 export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') => {
-  const mailerInfo = getTransporter();
-  const cleanSender = (process.env.GOOGLE_USER || process.env.SMTP_USER || 'no-reply@securevault.com')
-    .trim()
-    .replace(/['"]/g, '');
+  const user = (process.env.GOOGLE_USER || 'shuvomdhar8@gmail.com').trim().replace(/['"]/g, '');
+  const appPassword = (process.env.GOOGLE_APP_PASSWORD || '').trim().replace(/['"]/g, '');
 
   console.log(`\n========================================`);
   console.log(`🔑 [SecureVault OTP Service]`);
+  console.log(`Sender   : ${user}`);
   console.log(`Recipient: ${toEmail}`);
   console.log(`Purpose  : ${purpose}`);
   console.log(`OTP CODE : >>> ${otpCode} <<<`);
-  console.log(`Transport: ${mailerInfo ? mailerInfo.type : 'Simulation Fallback'}`);
   console.log(`========================================\n`);
 
-  if (!mailerInfo) {
-    console.warn('⚠️ No email credentials configured. Please configure GOOGLE_APP_PASSWORD in .env');
-    return { success: false, emailSent: false, simulated: true };
+  if (!appPassword) {
+    console.warn('⚠️ GOOGLE_APP_PASSWORD is not set in environment.');
+    return { success: false, emailSent: false };
   }
 
+  const { smtp587, smtp465 } = createGmailTransporter(user, appPassword);
+
   const mailOptions = {
-    from: `"SecureVault Security" <${cleanSender}>`,
+    from: `"SecureVault Security" <${user}>`,
     to: toEmail,
     subject: `🔐 Your SecureVault Verification Code: ${otpCode}`,
     text: `Your SecureVault OTP Code is ${otpCode}. Please use this code to verify your action (${purpose}). Valid for 10 minutes.`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
-        <h2 style="color: #6d28d9; text-align: center;">🔐 SecureVault Security Verification</h2>
-        <p style="font-size: 16px; color: #374151;">Hello,</p>
-        <p style="font-size: 16px; color: #374151;">Your verification code for <strong>${purpose}</strong> is:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #6d28d9; background: #f3e8ff; padding: 12px 24px; border-radius: 8px;">${otpCode}</span>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; width: 56px; height: 56px; line-height: 56px; border-radius: 16px; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #ffffff; font-size: 28px; font-weight: bold; text-align: center;">
+            🔐
+          </div>
+          <h2 style="color: #0f172a; margin-top: 16px; margin-bottom: 4px; font-size: 22px; font-weight: 700;">Account Verification</h2>
+          <p style="color: #64748b; font-size: 14px; margin: 0;">SecureVault Authentication Service</p>
         </div>
-        <p style="font-size: 14px; color: #6b7280;">This OTP is valid for 10 minutes. If you did not request this code, please ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #9ca3af; text-align: center;">SecureVault - Secret Storage & Password Manager</p>
+        
+        <p style="font-size: 15px; color: #334155; line-height: 1.6;">Hello,</p>
+        <p style="font-size: 15px; color: #334155; line-height: 1.6;">You requested a verification code for <strong>${purpose}</strong>. Use the code below to complete your authentication:</p>
+        
+        <div style="text-align: center; margin: 28px 0;">
+          <div style="display: inline-block; font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; padding: 14px 32px; border-radius: 12px;">
+            ${otpCode}
+          </div>
+        </div>
+        
+        <p style="font-size: 13px; color: #64748b; text-align: center;">This code will expire in <strong>10 minutes</strong>. If you did not make this request, you can safely ignore this email.</p>
+        
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">SecureVault &bull; End-to-End Encrypted Password Manager</p>
       </div>
     `,
   };
 
+  // Attempt 1: Port 587 STARTTLS (best for cloud providers)
   try {
-    const info = await mailerInfo.transporter.sendMail(mailOptions);
-    console.log('✅ OTP Email dispatched successfully via %s! MessageId: %s', mailerInfo.type, info.messageId);
-    return { success: true, emailSent: true, simulated: false };
-  } catch (error) {
-    console.error(`❌ Failed to send OTP email via ${mailerInfo.type}:`, error.message);
-    return { success: false, emailSent: false, simulated: true, error: error.message };
+    const info = await smtp587.sendMail(mailOptions);
+    console.log('✅ OTP Email dispatched via Port 587 STARTTLS! MessageId: %s', info.messageId);
+    return { success: true, emailSent: true };
+  } catch (err587) {
+    console.warn('⚠️ Port 587 attempt failed (%s). Retrying via Port 465 SSL...', err587.message);
+  }
+
+  // Attempt 2: Port 465 SSL
+  try {
+    const info = await smtp465.sendMail(mailOptions);
+    console.log('✅ OTP Email dispatched via Port 465 SSL! MessageId: %s', info.messageId);
+    return { success: true, emailSent: true };
+  } catch (err465) {
+    console.error('❌ Both Port 587 and Port 465 failed. Error:', err465.message);
+    return { success: false, emailSent: false, error: err465.message };
   }
 };
