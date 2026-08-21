@@ -14,16 +14,14 @@ const getTransporter = () => {
   if (user && appPassword) {
     try {
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        service: 'gmail',
         auth: {
           user,
           pass: appPassword.replace(/\s+/g, ''), // handle passwords with or without spaces
         },
-        connectionTimeout: 5000,
-        greetingTimeout: 5000,
-        socketTimeout: 5000,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000,
       });
       return { transporter, type: 'Gmail App Password (SMTP)' };
     } catch (err) {
