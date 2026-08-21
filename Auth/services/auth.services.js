@@ -30,11 +30,15 @@ export const registerUser = async ({ name, email, password }) => {
     existingUser.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
     await existingUser.save();
     
-    await sendOTPEmail(existingUser.email, otp, 'Account Verification');
+    const emailRes = await sendOTPEmail(existingUser.email, otp, 'Account Verification');
     return {
-      message: 'Verification OTP sent to your email.',
+      message: emailRes.emailSent
+        ? 'Verification OTP sent to your email.'
+        : `Verification OTP generated, but email could not be sent: ${emailRes.error || 'Mail service unconfigured'}`,
       email: existingUser.email,
       requiresOTP: true,
+      emailSent: emailRes.emailSent,
+      emailError: emailRes.error,
     };
   }
 
@@ -51,12 +55,16 @@ export const registerUser = async ({ name, email, password }) => {
     otpExpires: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  await sendOTPEmail(newUser.email, otp, 'Account Verification');
+  const emailRes = await sendOTPEmail(newUser.email, otp, 'Account Verification');
 
   return {
-    message: 'Verification OTP sent to your email.',
+    message: emailRes.emailSent
+      ? 'Verification OTP sent to your email.'
+      : `Registration complete, but email could not be sent: ${emailRes.error || 'Mail service unconfigured'}`,
     email: newUser.email,
     requiresOTP: true,
+    emailSent: emailRes.emailSent,
+    emailError: emailRes.error,
   };
 };
 
@@ -85,12 +93,16 @@ export const loginUser = async ({ email, password }) => {
   user.pendingSession = true;
   await user.save();
 
-  await sendOTPEmail(user.email, otp, 'Login Verification');
+  const emailRes = await sendOTPEmail(user.email, otp, 'Login Verification');
 
   return {
-    message: 'OTP sent to your email for verification.',
+    message: emailRes.emailSent
+      ? 'OTP sent to your email for verification.'
+      : `OTP generated, but email could not be sent: ${emailRes.error || 'Mail service unconfigured'}`,
     email: user.email,
     requiresOTP: true,
+    emailSent: emailRes.emailSent,
+    emailError: emailRes.error,
   };
 };
 
@@ -125,12 +137,16 @@ export const googleAuthUser = async ({ email, name, googleId, avatar }) => {
     await user.save();
   }
 
-  await sendOTPEmail(user.email, otp, 'Google Login Verification');
+  const emailRes = await sendOTPEmail(user.email, otp, 'Google Login Verification');
 
   return {
-    message: 'Google authentication successful. OTP sent to your email for verification.',
+    message: emailRes.emailSent
+      ? 'Google authentication successful. OTP sent to your email for verification.'
+      : `Google authentication successful. OTP generated, but email could not be sent: ${emailRes.error || 'Mail service unconfigured'}`,
     email: user.email,
     requiresOTP: true,
+    emailSent: emailRes.emailSent,
+    emailError: emailRes.error,
   };
 };
 
@@ -187,10 +203,14 @@ export const resendOTPCode = async ({ email }) => {
   user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
   await user.save();
 
-  await sendOTPEmail(user.email, otp, 'Resend OTP');
+  const emailRes = await sendOTPEmail(user.email, otp, 'Resend OTP');
 
   return {
-    message: 'A fresh OTP code has been dispatched to your email.',
+    message: emailRes.emailSent
+      ? 'A fresh OTP code has been dispatched to your email.'
+      : `A fresh OTP was generated, but email could not be sent: ${emailRes.error || 'Mail service unconfigured'}`,
     email: user.email,
+    emailSent: emailRes.emailSent,
+    emailError: emailRes.error,
   };
 };
