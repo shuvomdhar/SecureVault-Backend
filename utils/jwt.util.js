@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET_TOKEN || 'securevault_default_jwt_secret_token_2026';
+const JWT_SECRET = process.env.JWT_SECRET_TOKEN;
 const EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || '7d';
 
 export const generateToken = (payload) => {

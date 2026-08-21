@@ -14,8 +14,19 @@ const PORT = process.env.PORT || 3000;
 const PRIMARY_MONGO_URI = process.env.MONGO_URI;
 const FALLBACK_MONGO_URI = 'mongodb://127.0.0.1:27017/securevault';
 
-// Middleware
-app.use(cors({ origin: true, credentials: true }));
+// Dynamic CORS configuration allowing Vercel deployment & custom origins
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      return callback(null, origin);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -33,7 +44,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Global 404 handler
+// Root path response for deployment check
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'SecureVault Backend API Service Online',
+    health: '/api/health',
+  });
+});
+
+// Global 404 handler returning JSON instead of HTML
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'API Endpoint Not Found' });
 });
