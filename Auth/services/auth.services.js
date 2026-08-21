@@ -30,7 +30,11 @@ export const registerUser = async ({ name, email, password }) => {
     existingUser.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
     await existingUser.save();
     
-    await sendOTPEmail(existingUser.email, otp, 'Account Verification');
+    try {
+      await sendOTPEmail(existingUser.email, otp, 'Account Verification');
+    } catch (emailErr) {
+      throw new Error('Registration saved but failed to send verification email. Please try "Resend Code".');
+    }
     return {
       message: 'Account details updated. Verification OTP sent to your email.',
       email: existingUser.email,
@@ -51,7 +55,11 @@ export const registerUser = async ({ name, email, password }) => {
     otpExpires: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  await sendOTPEmail(newUser.email, otp, 'Account Verification');
+  try {
+    await sendOTPEmail(newUser.email, otp, 'Account Verification');
+  } catch (emailErr) {
+    throw new Error('Account created but failed to send verification email. Please try "Resend Code".');
+  }
 
   return {
     message: 'User registered successfully. Verification OTP sent to email.',
@@ -85,7 +93,11 @@ export const loginUser = async ({ email, password }) => {
   user.pendingSession = true;
   await user.save();
 
-  await sendOTPEmail(user.email, otp, 'Login Verification');
+  try {
+    await sendOTPEmail(user.email, otp, 'Login Verification');
+  } catch (emailErr) {
+    throw new Error('Login accepted but failed to send OTP email. Please try again.');
+  }
 
   return {
     message: 'Login credentials accepted. OTP sent to your email for verification.',
@@ -125,7 +137,11 @@ export const googleAuthUser = async ({ email, name, googleId, avatar }) => {
     await user.save();
   }
 
-  await sendOTPEmail(user.email, otp, 'Google Login Verification');
+  try {
+    await sendOTPEmail(user.email, otp, 'Google Login Verification');
+  } catch (emailErr) {
+    throw new Error('Google auth succeeded but failed to send OTP email. Please try again.');
+  }
 
   return {
     message: 'Google authentication successful. OTP sent to your email for verification.',
@@ -187,7 +203,11 @@ export const resendOTPCode = async ({ email }) => {
   user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
   await user.save();
 
-  await sendOTPEmail(user.email, otp, 'Resend OTP');
+  try {
+    await sendOTPEmail(user.email, otp, 'Resend OTP');
+  } catch (emailErr) {
+    throw new Error('Failed to resend verification email. Please try again later.');
+  }
 
   return {
     message: 'A fresh OTP code has been dispatched to your email.',

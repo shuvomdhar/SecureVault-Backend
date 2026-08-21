@@ -1,37 +1,72 @@
 import nodemailer from 'nodemailer';
 
+/**
+ * Creates a Nodemailer transporter using one of two strategies:
+ *   1. Gmail App Password (recommended — never expires)
+ *   2. Gmail OAuth2 (refresh token can expire after 7 days in "Testing" mode)
+ *
+ * Set GOOGLE_APP_PASSWORD in your .env to use strategy 1.
+ * Set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN for strategy 2.
+ */
 const getTransporter = () => {
   const user = (process.env.GOOGLE_USER || '').trim().replace(/['"]/g, '');
+
+  if (!user) {
+    console.warn('⚠️ GOOGLE_USER is not set. Email sending disabled.');
+    return null;
+  }
+
+  // Strategy 1: Gmail App Password (simple SMTP — recommended)
+  const appPassword = (process.env.GOOGLE_APP_PASSWORD || '').trim().replace(/['"]/g, '');
+  if (appPassword) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user,
+          pass: appPassword,
+        },
+      });
+      console.log('📧 Mailer: Using Gmail App Password (SMTP) transport.');
+      return transporter;
+    } catch (err) {
+      console.error('❌ Error creating Gmail App Password transporter:', err.message);
+      return null;
+    }
+  }
+
+  // Strategy 2: Gmail OAuth2 (refresh token may expire)
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim().replace(/['"]/g, '');
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim().replace(/['"]/g, '');
   const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim().replace(/['"]/g, '');
 
-  if (!user || !clientId || !clientSecret || !refreshToken) {
-    console.warn('⚠️ Mailer configuration incomplete. Email sending will run in fallback simulation mode.');
-    return null;
+  if (clientId && clientSecret && refreshToken) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          type: 'OAuth2',
+          user,
+          clientId,
+          clientSecret,
+          refreshToken,
+        },
+      });
+      console.log('📧 Mailer: Using Gmail OAuth2 transport.');
+      return transporter;
+    } catch (err) {
+      console.error('❌ Error creating Gmail OAuth2 transporter:', err.message);
+      return null;
+    }
   }
 
-  try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user,
-        clientId,
-        clientSecret,
-        refreshToken,
-      },
-    });
-
-    return transporter;
-  } catch (err) {
-    console.error('❌ Error creating Nodemailer transporter:', err.message);
-    return null;
-  }
+  console.warn('⚠️ Mailer configuration incomplete. No GOOGLE_APP_PASSWORD or OAuth2 credentials found. Email sending disabled.');
+  return null;
 };
 
 /**
- * Send OTP verification email to user
+ * Send OTP verification email to user.
+ * THROWS on failure so callers can report the error to the frontend.
  */
 export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') => {
   const transporter = getTransporter();
@@ -45,6 +80,7 @@ export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') =
   console.log(`========================================\n`);
 
   if (!transporter) {
+    console.warn('⚠️ No email transporter available. OTP logged to console only (simulated mode).');
     return { success: true, simulated: true, otp: otpCode };
   }
 
@@ -70,10 +106,11 @@ export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') =
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ OTP Email dispatched via Gmail OAuth2! MessageId: %s', info.messageId);
-    return { success: true, simulated: false, otp: otpCode };
+    console.log('✅ OTP Email dispatched via Gmail! MessageId: %s', info.messageId);
+    return { success: true, simulated: false };
   } catch (error) {
-    console.error('❌ Failed to send email via Nodemailer:', error.message);
-    return { success: true, simulated: true, otp: otpCode, error: error.message };
+    console.error('❌ Failed to send OTP email:', error.message);
+    // THROW instead of silently swallowing — callers must handle this
+    throw new Error(`Failed to send verification email. Please try again later. (${error.message})`);
   }
 };

@@ -57,11 +57,6 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: 'API Endpoint Not Found' });
 });
 
-// Start Express HTTP Server
-app.listen(PORT, () => {
-  console.log(`🚀 SecureVault backend server running on http://localhost:${PORT}`);
-});
-
 // MongoDB Connection Handler with automatic local fallback
 const connectDatabase = async () => {
   if (PRIMARY_MONGO_URI) {
@@ -82,4 +77,12 @@ const connectDatabase = async () => {
   }
 };
 
-connectDatabase();
+// Connect to MongoDB FIRST, then start accepting HTTP requests
+const startServer = async () => {
+  await connectDatabase();
+  app.listen(PORT, () => {
+    console.log(`🚀 SecureVault backend server running on http://localhost:${PORT}`);
+  });
+};
+
+startServer();
