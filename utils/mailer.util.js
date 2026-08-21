@@ -102,8 +102,8 @@ export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') =
   console.log(`========================================\n`);
 
   if (!mailerInfo) {
-    console.warn('⚠️ No email credentials configured. Returning OTP in response for testing/demo.');
-    return { success: true, emailSent: false, simulated: true, otp: otpCode };
+    console.warn('⚠️ No email credentials configured. Please configure GOOGLE_APP_PASSWORD in .env');
+    return { success: false, emailSent: false, simulated: true };
   }
 
   const mailOptions = {
@@ -132,8 +132,6 @@ export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') =
     return { success: true, emailSent: true, simulated: false };
   } catch (error) {
     console.error(`❌ Failed to send OTP email via ${mailerInfo.type}:`, error.message);
-    console.warn('⚠️ Falling back to demo mode so user authentication is not blocked.');
-    // Return simulated: true with OTP so user can still complete verification
-    return { success: true, emailSent: false, simulated: true, otp: otpCode, error: error.message };
+    return { success: false, emailSent: false, simulated: true, error: error.message };
   }
 };

@@ -30,14 +30,11 @@ export const registerUser = async ({ name, email, password }) => {
     existingUser.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
     await existingUser.save();
     
-    const emailRes = await sendOTPEmail(existingUser.email, otp, 'Account Verification');
+    await sendOTPEmail(existingUser.email, otp, 'Account Verification');
     return {
-      message: emailRes.emailSent 
-        ? 'Account details updated. Verification OTP sent to your email.'
-        : 'Account details updated. Verification OTP generated.',
+      message: 'Verification OTP sent to your email.',
       email: existingUser.email,
       requiresOTP: true,
-      ...(emailRes.simulated ? { otp } : {}),
     };
   }
 
@@ -54,15 +51,12 @@ export const registerUser = async ({ name, email, password }) => {
     otpExpires: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  const emailRes = await sendOTPEmail(newUser.email, otp, 'Account Verification');
+  await sendOTPEmail(newUser.email, otp, 'Account Verification');
 
   return {
-    message: emailRes.emailSent
-      ? 'User registered successfully. Verification OTP sent to your email.'
-      : 'User registered successfully. Verification OTP generated.',
+    message: 'Verification OTP sent to your email.',
     email: newUser.email,
     requiresOTP: true,
-    ...(emailRes.simulated ? { otp } : {}),
   };
 };
 
@@ -91,15 +85,12 @@ export const loginUser = async ({ email, password }) => {
   user.pendingSession = true;
   await user.save();
 
-  const emailRes = await sendOTPEmail(user.email, otp, 'Login Verification');
+  await sendOTPEmail(user.email, otp, 'Login Verification');
 
   return {
-    message: emailRes.emailSent
-      ? 'Login credentials accepted. OTP sent to your email for verification.'
-      : 'Login credentials accepted. OTP generated for verification.',
+    message: 'OTP sent to your email for verification.',
     email: user.email,
     requiresOTP: true,
-    ...(emailRes.simulated ? { otp } : {}),
   };
 };
 
@@ -134,15 +125,12 @@ export const googleAuthUser = async ({ email, name, googleId, avatar }) => {
     await user.save();
   }
 
-  const emailRes = await sendOTPEmail(user.email, otp, 'Google Login Verification');
+  await sendOTPEmail(user.email, otp, 'Google Login Verification');
 
   return {
-    message: emailRes.emailSent
-      ? 'Google authentication successful. OTP sent to your email for verification.'
-      : 'Google authentication successful. OTP generated for verification.',
+    message: 'Google authentication successful. OTP sent to your email for verification.',
     email: user.email,
     requiresOTP: true,
-    ...(emailRes.simulated ? { otp } : {}),
   };
 };
 
@@ -199,13 +187,10 @@ export const resendOTPCode = async ({ email }) => {
   user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
   await user.save();
 
-  const emailRes = await sendOTPEmail(user.email, otp, 'Resend OTP');
+  await sendOTPEmail(user.email, otp, 'Resend OTP');
 
   return {
-    message: emailRes.emailSent
-      ? 'A fresh OTP code has been dispatched to your email.'
-      : 'A fresh OTP code has been generated.',
+    message: 'A fresh OTP code has been dispatched to your email.',
     email: user.email,
-    ...(emailRes.simulated ? { otp } : {}),
   };
 };
